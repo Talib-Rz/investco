@@ -62,7 +62,7 @@ export function calculatePosition(input) {
   if (side === "buy") {
     const denominator = quantity * quoteToInvestmentRate * (1 - closeAndMaintenanceRate);
     const numerator = quantity * entryPrice * quoteToInvestmentRate - availableEquity;
-    if (denominator > 0 && numerator > 0) {
+    if (denominator > 0 && numerator >= 0) {
       liquidationPrice = numerator / denominator;
     }
   } else {
@@ -99,6 +99,7 @@ export function calculatePosition(input) {
     closingFeeRate,
     additionalMargin,
     availableEquity,
+    remainingMarginBuffer: availableEquity - positionNotional * closeAndMaintenanceRate,
     liquidationPrice,
     liquidationDistance,
     liquidationDistancePercent: liquidationDistance === null ? null : (liquidationDistance / entryPrice) * 100,
@@ -126,6 +127,7 @@ export function calculateAdditionalMargin(position, stressPrice) {
   const existingEquity = position.investment
     - position.openingFee
     - position.fundingFee
+    + position.additionalMargin
     + stressProfitLoss;
   const additionalMarginRequired = Math.max(0, requiredEquity - existingEquity);
   const updatedPosition = calculatePosition({
