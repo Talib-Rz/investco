@@ -165,7 +165,7 @@ function renderPosition(position) {
   setText("result-net-return", signedPercent(position.returnPercent));
   setText("result-price-move", `${signedMoney(position.priceChange, quoteCurrency, 6)} (${signedPercent(position.priceChangePercent)})`);
   setText("result-gross-pnl", signedMoney(position.grossProfitLoss, investmentCurrency));
-  setText("result-fees", `−${money(position.totalFees, investmentCurrency)}`);
+  setText("result-fees", money(position.totalFees, investmentCurrency));
   setText("result-total-value", money(position.totalValueAtTarget, investmentCurrency));
   setClass(value("result-net-pnl"), "negative", !positive);
   setClass(value("result-net-return"), "negative", !positive);
@@ -341,6 +341,10 @@ function renderScenarios(position, primaryResult) {
   rows.replaceChildren();
   if (!position || position.liquidationPrice === null) {
     addEmptyScenario("A positive liquidation estimate is needed for scenarios.");
+    return;
+  }
+  if (position.liquidationPrice <= 0) {
+    addEmptyScenario("No positive adverse price levels are available beyond a zero liquidation price.");
     return;
   }
   const entered = fields.scenarioPrices.value.trim();

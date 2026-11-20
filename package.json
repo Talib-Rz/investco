@@ -1,16 +1,12 @@
 {
   "name": "investco",
   "version": "1.0.0",
-  "description": "investment calculator",
+  "description": "Investment and leverage calculator",
   "type": "module",
   "main": "calculations.js",
   "scripts": {
     "start": "python3 -m http.server 4173",
     "test": "node --test"
-  },
-  "repository": {
-    "type": "git",
-    "url": "http://localhost:26831/Talib-Rz/investco"
   },
   "keywords": [],
   "author": "",
