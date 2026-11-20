@@ -14,6 +14,10 @@ Open [http://localhost:4173](http://localhost:4173). Run the calculation tests w
 npm test
 ```
 
+## Download for offline use
+
+Run `npm run build` to generate `/investco-mobile.html`, a self-contained copy of the calculator with its styles and calculation code embedded. Download that file to your phone and open it in a browser; it does not need a server or internet connection.
+
 ## Calculation assumptions
 
 - Position notional is the initial margin multiplied by leverage. Quantity and P&L are converted between the asset quote currency and investment currency using the entered FX rate.
