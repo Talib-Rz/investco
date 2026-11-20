@@ -1,4 +1,4 @@
-const SURVIVAL_BUFFER = 0.01;
+const SURVIVAL_BUFFER_PRICE = 0.01;
 
 function assertFinitePositive(value, label) {
   if (!Number.isFinite(value) || value <= 0) {
@@ -121,9 +121,10 @@ export function calculateAdditionalMargin(position, stressPrice) {
   const stressProfitLoss = side === "buy"
     ? quantity * (stressPrice - entryPrice) * quoteToInvestmentRate
     : quantity * (entryPrice - stressPrice) * quoteToInvestmentRate;
-  const requiredEquity = stressNotional
-    * (position.maintenanceMarginRate + position.closingFeeRate)
-    + SURVIVAL_BUFFER;
+  const liquidationRate = position.maintenanceMarginRate + position.closingFeeRate;
+  const bufferRate = side === "buy" ? 1 - liquidationRate : 1 + liquidationRate;
+  const requiredEquity = stressNotional * liquidationRate
+    + quantity * quoteToInvestmentRate * bufferRate * SURVIVAL_BUFFER_PRICE;
   const existingEquity = position.investment
     - position.openingFee
     - position.fundingFee

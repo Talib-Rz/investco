@@ -2,7 +2,7 @@ import { calculateAdditionalMargin, calculatePosition } from "./calculations.js"
 
 const byId = (id) => document.getElementById(id);
 const currencySymbols = { INR: "₹", USD: "$", USDT: "₮", EUR: "€", GBP: "£" };
-const state = { side: "buy", lastMarginResult: null };
+const state = { side: "buy", lastMarginResult: null, fxPair: "INR/USD" };
 const fields = {
   asset: byId("asset-name"),
   entry: byId("entry-price"),
@@ -40,6 +40,10 @@ function money(value, currency, digits = 2) {
   return currencyFormatter(currency, digits).format(Math.abs(value) < 0.0000001 ? 0 : value);
 }
 
+function priceMoney(value, currency) {
+  return money(value, currency, 6);
+}
+
 function signedMoney(value, currency, digits = 2) {
   if (!Number.isFinite(value)) return "—";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
@@ -67,6 +71,7 @@ function updateCurrencyLabels() {
   const quoteCurrency = fields.quoteCurrency.value;
   const sameCurrency = investmentCurrency === quoteCurrency;
   const rate = byId("exchange-rate");
+  const pair = `${investmentCurrency}/${quoteCurrency}`;
   byId("investment-symbol").textContent = currencySymbols[investmentCurrency] || investmentCurrency;
   byId("funding-symbol").textContent = currencySymbols[investmentCurrency] || investmentCurrency;
   byId("quote-symbol").textContent = currencySymbols[quoteCurrency] || quoteCurrency;
@@ -78,9 +83,10 @@ function updateCurrencyLabels() {
     rate.value = "1";
     rate.disabled = true;
   } else {
-    if (rate.disabled) rate.value = "";
+    if (rate.disabled || state.fxPair !== pair) rate.value = "";
     rate.disabled = false;
   }
+  state.fxPair = pair;
 }
 
 function setText(id, value) {
@@ -152,12 +158,12 @@ function renderPosition(position) {
   setText("result-leverage", `At ${plainNumber(position.leverage, 2)}× leverage`);
   setText("result-quantity", plainNumber(position.quantity, 8));
   setText("quantity-asset", `${asset || "Asset"} units`);
-  setText("result-prices", `${money(position.entryPrice, quoteCurrency)} → ${money(position.targetPrice, quoteCurrency)}`);
+  setText("result-prices", `${priceMoney(position.entryPrice, quoteCurrency)} → ${priceMoney(position.targetPrice, quoteCurrency)}`);
   setText("result-price-currencies", `${quoteCurrency} quote`);
 
   setText("result-net-pnl", signedMoney(position.netProfitLoss, investmentCurrency));
   setText("result-net-return", signedPercent(position.returnPercent));
-  setText("result-price-move", `${signedMoney(position.priceChange, quoteCurrency)} (${signedPercent(position.priceChangePercent)})`);
+  setText("result-price-move", `${signedMoney(position.priceChange, quoteCurrency, 6)} (${signedPercent(position.priceChangePercent)})`);
   setText("result-gross-pnl", signedMoney(position.grossProfitLoss, investmentCurrency));
   setText("result-fees", `−${money(position.totalFees, investmentCurrency)}`);
   setText("result-total-value", money(position.totalValueAtTarget, investmentCurrency));
@@ -178,9 +184,9 @@ function renderPosition(position) {
     const movement = state.side === "buy"
       ? position.entryPrice - position.liquidationPrice
       : position.liquidationPrice - position.entryPrice;
-    setText("result-liquidation", money(position.liquidationPrice, quoteCurrency));
-    setText("liq-distance", `${money(position.liquidationDistance, quoteCurrency)} from entry price`);
-    setText("result-liq-move", `${money(movement, quoteCurrency)} ${state.side === "buy" ? "drop" : "rise"}`);
+    setText("result-liquidation", priceMoney(position.liquidationPrice, quoteCurrency));
+    setText("liq-distance", `${priceMoney(position.liquidationDistance, quoteCurrency)} from entry price`);
+    setText("result-liq-move", `${priceMoney(movement, quoteCurrency)} ${state.side === "buy" ? "drop" : "rise"}`);
     setText("result-liq-percent", `${position.liquidationDistancePercent.toFixed(2)}% ${state.side === "buy" ? "drop" : "rise"}`);
   }
   setText("result-available-equity", money(position.availableEquity, investmentCurrency));
@@ -193,6 +199,7 @@ function renderPosition(position) {
   value("risk-notice").textContent = fields.marginMode.value === "cross"
     ? "Cross margin selected: this display remains an isolated-margin estimate. Other collateral and open positions can materially change cross-margin liquidation."
     : "Simplified linear isolated-margin estimate. Actual exchange liquidation can differ due to mark price, fee tiers, risk limits, funding, and exchange rules.";
+  setText("settings-footnote", `${byId("auto-topup").value === "on" ? "Auto top-up is selected but not modeled. " : ""}Funding is entered as a one-time amount in your investment currency.`);
 
   const direction = state.side === "buy" ? "Below liquidation" : "Above liquidation";
   setText("target-direction", `${state.side.toUpperCase()} target`);
@@ -209,7 +216,7 @@ function buildMarker(label, value, currency, positionPercent, className) {
   if (positionPercent < 9) marker.classList.add("label-left");
   if (positionPercent > 91) marker.classList.add("label-right");
   marker.style.left = `${positionPercent}%`;
-  marker.setAttribute("aria-label", `${label}: ${money(value, currency)}`);
+  marker.setAttribute("aria-label", `${label}: ${priceMoney(value, currency)}`);
   const line = document.createElement("span");
   line.className = "marker-line";
   const dot = document.createElement("span");
@@ -219,7 +226,7 @@ function buildMarker(label, value, currency, positionPercent, className) {
   const name = document.createElement("small");
   name.textContent = label;
   const price = document.createElement("strong");
-  price.textContent = money(value, currency);
+  price.textContent = priceMoney(value, currency);
   labelWrap.append(name, price);
   marker.append(line, dot, labelWrap);
   return marker;
@@ -258,7 +265,7 @@ function renderPriceMap(position, marginResult) {
     const positionPercent = 5 + ((level.value - minimum) / range) * 90;
     container.append(buildMarker(level.label, level.value, quoteCurrency, positionPercent, level.className));
   });
-  setText("plot-range", `${money(minimum, quoteCurrency)} — ${money(maximum, quoteCurrency)}`);
+  setText("plot-range", `${priceMoney(minimum, quoteCurrency)} — ${priceMoney(maximum, quoteCurrency)}`);
 }
 
 function renderMargin() {
@@ -291,7 +298,7 @@ function renderMargin() {
     setText("result-add-margin", money(marginResult.additionalMarginRequired, investmentCurrency));
     setText("result-new-liq", marginResult.updatedPosition.liquidationPrice === null
       ? "No positive level"
-      : money(marginResult.updatedPosition.liquidationPrice, quoteCurrency));
+      : priceMoney(marginResult.updatedPosition.liquidationPrice, quoteCurrency));
     setText("result-total-margin", money(marginResult.totalMarginAfterDeposit, investmentCurrency));
     setText("result-effective-leverage", `${plainNumber(marginResult.effectiveLeverage, 2)}×`);
 
@@ -300,8 +307,8 @@ function renderMargin() {
     const oldBuffer = position.liquidationPrice === null ? null : Math.abs(position.entryPrice - position.liquidationPrice);
     const newLiq = marginResult.updatedPosition.liquidationPrice;
     const newBuffer = newLiq === null ? null : Math.abs(position.entryPrice - newLiq);
-    setText("compare-old-liq", position.liquidationPrice === null ? "—" : money(position.liquidationPrice, quoteCurrency));
-    setText("compare-new-liq", newLiq === null ? "—" : money(newLiq, quoteCurrency));
+    setText("compare-old-liq", position.liquidationPrice === null ? "—" : priceMoney(position.liquidationPrice, quoteCurrency));
+    setText("compare-new-liq", newLiq === null ? "—" : priceMoney(newLiq, quoteCurrency));
     setText("compare-old-margin", money(oldMargin, investmentCurrency));
     setText("compare-new-margin", money(marginResult.totalMarginAfterDeposit, investmentCurrency));
     setText("compare-old-leverage", `${plainNumber(oldLeverage, 2)}×`);
@@ -357,7 +364,7 @@ function renderScenarios(position, primaryResult) {
     const priceCell = document.createElement("td");
     const marginCell = document.createElement("td");
     const newLiquidationCell = document.createElement("td");
-    priceCell.textContent = money(price, quoteCurrency);
+    priceCell.textContent = priceMoney(price, quoteCurrency);
     if (!result.valid) {
       marginCell.textContent = "Not beyond liquidation";
       newLiquidationCell.textContent = "—";
@@ -365,7 +372,7 @@ function renderScenarios(position, primaryResult) {
       marginCell.textContent = money(result.additionalMarginRequired, investmentCurrency);
       newLiquidationCell.textContent = result.updatedPosition.liquidationPrice === null
         ? "—"
-        : money(result.updatedPosition.liquidationPrice, quoteCurrency);
+        : priceMoney(result.updatedPosition.liquidationPrice, quoteCurrency);
       if (result.additionalMarginRequired === 0 && primaryResult?.stressPrice === price) {
         marginCell.textContent = "Already covered";
       }
