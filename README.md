@@ -16,7 +16,7 @@ npm test
 
 ## Download for offline use
 
-Run `npm run build` to generate `/investco-mobile.html`, a self-contained copy of the calculator with its styles and calculation code embedded. Download that file to your phone and open it in a browser; it does not need a server or internet connection.
+Run `npm run build` to generate `investco-mobile.html`, a self-contained copy of the calculator with its styles and calculation code embedded. Download that file from the repository to your phone and open it in a browser; it does not need a server or internet connection.
 
 ## Calculation assumptions
 

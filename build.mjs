@@ -12,14 +12,13 @@ const [html, css, app, calculations] = await Promise.all([
   readFile(resolve(root, "calculations.js"), "utf8"),
 ]);
 
+const bundledScript = `<script>\n${calculations.replace(/^export /gm, "")}\n${app.replace(/^import .*;\n/, "")}\n</script>`;
 const standaloneHtml = html
   .replace(/    <link rel="preconnect"[^>]*>\n/g, "")
   .replace(/    <link href="https:\/\/fonts\.googleapis\.com[^>]*>\n/g, "")
   .replace('    <link rel="stylesheet" href="styles.css">', `    <style>\n${css}\n    </style>`)
-  .replace(
-    '    <script type="module" src="app.js"></script>',
-    `    <script>\n${calculations.replace(/^export /gm, "")}\n${app.replace(/^import .*;\n/, "")}\n    </script>`,
-  );
+  .replace('    <script type="module" src="app.js"></script>\n', "")
+  .replace("</body>", `  ${bundledScript}\n  </body>`);
 
 if (
   standaloneHtml === html
@@ -27,6 +26,7 @@ if (
   || standaloneHtml.includes('src="app.js"')
   || standaloneHtml.includes('href="https://fonts.googleapis.com')
   || standaloneHtml.includes('import { calculate')
+  || !standaloneHtml.includes(`${bundledScript}\n  </body>`)
 ) {
   throw new Error("Could not generate a self-contained calculator HTML file.");
 }
