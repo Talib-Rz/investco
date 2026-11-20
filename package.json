@@ -2,9 +2,11 @@
   "name": "investco",
   "version": "1.0.0",
   "description": "investment calculator",
-  "main": "index.js",
+  "type": "module",
+  "main": "calculations.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "python3 -m http.server 4173",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
