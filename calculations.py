@@ -64,6 +64,11 @@ def _assert_rate(value: float, label: str) -> None:
         raise ValueError(f"{label} must be at least 0 and less than 1.")
 
 
+def _assert_finite_results(*values: float) -> None:
+    if not all(isfinite(value) for value in values):
+        raise ValueError("Values are too large or too small to calculate reliably.")
+
+
 def calculate_position(
     *,
     side: Side,
@@ -85,17 +90,28 @@ def calculate_position(
     _assert_finite_positive(target_price, "Target price")
     _assert_finite_positive(investment, "Investment")
     _assert_finite_positive(leverage, "Leverage")
+    if not 1 <= leverage <= 100:
+        raise ValueError("Leverage must be between 1 and 100.")
     _assert_finite_positive(quote_to_investment_rate, "Exchange rate")
     _assert_rate(maintenance_margin_rate, "Maintenance margin rate")
     _assert_rate(opening_fee_rate, "Opening fee rate")
     _assert_rate(closing_fee_rate, "Closing fee rate")
+    if maintenance_margin_rate + closing_fee_rate >= 1:
+        raise ValueError("Maintenance margin and closing fee rates must total less than 100%.")
     if not isfinite(funding_fee) or funding_fee < 0:
         raise ValueError("Funding fee must be zero or a positive number.")
     if not isfinite(additional_margin) or additional_margin < 0:
         raise ValueError("Additional margin must be zero or a positive number.")
 
     position_notional = investment * leverage
-    quantity = position_notional / (entry_price * quote_to_investment_rate)
+    entry_in_investment_currency = entry_price * quote_to_investment_rate
+    _assert_finite_results(position_notional, entry_in_investment_currency)
+    if entry_in_investment_currency <= 0:
+        raise ValueError("Values are too large or too small to calculate reliably.")
+    quantity = position_notional / entry_in_investment_currency
+    _assert_finite_results(quantity)
+    if quantity <= 0:
+        raise ValueError("Values are too large or too small to calculate reliably.")
     price_change = target_price - entry_price if side == "buy" else entry_price - target_price
     price_change_percent = price_change / entry_price * 100
     gross_profit_loss = quantity * price_change * quote_to_investment_rate
@@ -106,24 +122,47 @@ def calculate_position(
     total_value_at_target = investment + net_profit_loss
     available_equity = investment - opening_fee - funding_fee + additional_margin
     close_and_maintenance_rate = maintenance_margin_rate + closing_fee_rate
+    remaining_margin_buffer = available_equity - position_notional * close_and_maintenance_rate
+    _assert_finite_results(
+        price_change, price_change_percent, gross_profit_loss, opening_fee, closing_fee,
+        total_fees, net_profit_loss, total_value_at_target, available_equity,
+        remaining_margin_buffer,
+    )
+    if remaining_margin_buffer <= 0:
+        raise ValueError(
+            "The trade would be at or beyond liquidation at the entry price. "
+            "Reduce leverage, fees or funding, or increase your margin."
+        )
     liquidation_price = None
 
     if side == "buy":
         denominator = quantity * quote_to_investment_rate * (1 - close_and_maintenance_rate)
         numerator = quantity * entry_price * quote_to_investment_rate - available_equity
-        if denominator > 0 and numerator >= 0:
+        _assert_finite_results(denominator, numerator)
+        if denominator <= 0:
+            raise ValueError("Values are too large or too small to calculate reliably.")
+        if numerator >= 0:
             liquidation_price = numerator / denominator
     else:
         denominator = quantity * quote_to_investment_rate * (1 + close_and_maintenance_rate)
-        liquidation_price = (
-            available_equity + quantity * entry_price * quote_to_investment_rate
-        ) / denominator
+        numerator = available_equity + quantity * entry_price * quote_to_investment_rate
+        _assert_finite_results(denominator, numerator)
+        if denominator <= 0:
+            raise ValueError("Values are too large or too small to calculate reliably.")
+        liquidation_price = numerator / denominator
         if liquidation_price <= 0:
             liquidation_price = None
 
     liquidation_distance = (
         None if liquidation_price is None else abs(entry_price - liquidation_price)
     )
+    return_percent = net_profit_loss / investment * 100
+    liquidation_distance_percent = (
+        None if liquidation_distance is None else liquidation_distance / entry_price * 100
+    )
+    _assert_finite_results(return_percent)
+    if liquidation_price is not None and liquidation_distance is not None and liquidation_distance_percent is not None:
+        _assert_finite_results(liquidation_price, liquidation_distance, liquidation_distance_percent)
     return PositionResult(
         side=side,
         entry_price=entry_price,
@@ -135,7 +174,7 @@ def calculate_position(
         quantity=quantity,
         price_change=price_change,
         price_change_percent=price_change_percent,
-        return_percent=net_profit_loss / investment * 100,
+        return_percent=return_percent,
         gross_profit_loss=gross_profit_loss,
         net_profit_loss=net_profit_loss,
         total_value_at_target=total_value_at_target,
@@ -148,14 +187,10 @@ def calculate_position(
         closing_fee_rate=closing_fee_rate,
         additional_margin=additional_margin,
         available_equity=available_equity,
-        remaining_margin_buffer=(
-            available_equity - position_notional * close_and_maintenance_rate
-        ),
+        remaining_margin_buffer=remaining_margin_buffer,
         liquidation_price=liquidation_price,
         liquidation_distance=liquidation_distance,
-        liquidation_distance_percent=(
-            None if liquidation_distance is None else liquidation_distance / entry_price * 100
-        ),
+        liquidation_distance_percent=liquidation_distance_percent,
     )
 
 
@@ -226,9 +261,12 @@ def calculate_additional_margin(position: PositionResult, stress_price: float) -
         + position.additional_margin
         + stress_profit_loss
     )
+    _assert_finite_results(stress_notional, stress_profit_loss, required_equity, existing_equity)
     additional_margin_required = max(0, required_equity - existing_equity)
+    _assert_finite_results(additional_margin_required)
     updated_position = calculate_position_with_deposit(position, additional_margin_required)
     total_margin_after_deposit = position.investment + updated_position.additional_margin
+    _assert_finite_results(total_margin_after_deposit)
     return MarginResult(
         valid=True,
         stress_price=stress_price,

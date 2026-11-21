@@ -262,6 +262,32 @@ class PositionCalculationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Stress price"):
             calculate_additional_margin(position, 0)
 
+    def test_invalid_margin_and_leverage_conditions_are_rejected(self):
+        for side in ("buy", "sell"):
+            for margin_rate, closing_rate in ((0.6, 0.4), (0.7, 0.4)):
+                with self.subTest(side=side, maintenance=margin_rate, closing=closing_rate):
+                    with self.assertRaisesRegex(ValueError, "total less than 100%"):
+                        base(side=side, maintenance_margin_rate=margin_rate, closing_fee_rate=closing_rate)
+            for margin_rate in (0.2, 0.3):
+                with self.subTest(side=side, maintenance=margin_rate):
+                    with self.assertRaisesRegex(ValueError, "at or beyond liquidation"):
+                        base(side=side, maintenance_margin_rate=margin_rate)
+        for leverage in (0.5, 101):
+            with self.subTest(leverage=leverage):
+                with self.assertRaisesRegex(ValueError, "between 1 and 100"):
+                    base(leverage=leverage)
+        with self.assertRaisesRegex(ValueError, "at or beyond liquidation"):
+            base(funding_fee=35000)
+
+    def test_extreme_rates_and_stress_values_fail_explicitly(self):
+        for rate in (5e-324, 1e308):
+            with self.subTest(rate=rate):
+                with self.assertRaisesRegex(ValueError, "too large or too small"):
+                    base(quote_to_investment_rate=rate)
+        position = base(side="sell", target_price=2500)
+        with self.assertRaisesRegex(ValueError, "too large or too small"):
+            calculate_additional_margin(position, 1e308)
+
 
 if __name__ == "__main__":
     unittest.main()

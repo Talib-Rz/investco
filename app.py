@@ -19,23 +19,16 @@ st.set_page_config(
     page_title="Investco | Trade calculator",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="auto",
+    initial_sidebar_state="collapsed",
 )
 
 st.markdown(
     """
     <style>
-    [data-testid="stAppDeployButton"], [data-testid="stMainMenu"] { display: none; }
+    [data-testid="stAppDeployButton"], [data-testid="stMainMenu"],
+    [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stExpandSidebarButton"] { display: none; }
     .block-container { max-width: 1120px; padding-top: 2.5rem; padding-bottom: 3rem; }
-    [data-testid="stSidebar"] { border-right: 1px solid #e0e6f0; }
-    [data-testid="stSidebar"] .block-container { padding-top: 2rem; }
-    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
-        flex-wrap: nowrap;
-        gap: 0.5rem;
-    }
-    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-        min-width: 0;
-    }
     [data-testid="stMain"] h1 { letter-spacing: -0.035em; }
     [data-testid="stMain"] h3 { letter-spacing: -0.015em; }
     [data-testid="stMetric"] {
@@ -80,6 +73,16 @@ st.markdown(
         [data-testid="stTabs"] [role="tablist"] { gap: 1rem; }
         [data-testid="stTabs"] [role="tab"] { flex: 1 1 auto; }
     }
+    [data-testid="stMain"] .st-key-price_pair [data-testid="stHorizontalBlock"],
+    [data-testid="stMain"] .st-key-investment_pair [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+    }
+    [data-testid="stMain"] .st-key-price_pair [data-testid="stColumn"],
+    [data-testid="stMain"] .st-key-investment_pair [data-testid="stColumn"] {
+        flex-basis: auto;
+        min-width: 0;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -107,32 +110,38 @@ def percent(value: float, *, signed: bool = False) -> str:
     return f"{rounded:+d}%" if signed and rounded else f"{rounded}%"
 
 
-with st.sidebar:
-    st.title("Investco")
-    st.caption("TRADE CALCULATOR")
-    st.divider()
+st.title("Investco")
+st.caption("Calculate your trade and plan for liquidation.")
+
+with st.container(border=True):
     st.subheader("Your trade")
     side_label = st.radio("Buy or sell", ("BUY · Long", "SELL · Short"), horizontal=True)
     side = "buy" if side_label.startswith("BUY") else "sell"
     asset = st.text_input("Asset name (optional)", placeholder="e.g. Bitcoin")
-    quote_col, entry_col = st.columns([1.15, 1.85], gap="small", vertical_alignment="bottom")
-    with quote_col:
-        quote_currency = st.selectbox("Price currency", CURRENCIES, index=1, key="quote_currency")
-    with entry_col:
-        entry_price = st.number_input(
-            "Buy or sell price", min_value=1, value=3500, step=1, key="entry_price"
+    prices_col, money_col = st.columns(2, gap="large")
+    with prices_col:
+        with st.container(key="price_pair"):
+            quote_col, entry_col = st.columns([1.15, 1.85], gap="small", vertical_alignment="bottom")
+            with quote_col:
+                quote_currency = st.selectbox("Price currency", CURRENCIES, index=1, key="quote_currency")
+            with entry_col:
+                entry_price = st.number_input(
+                    "Buy price" if side == "buy" else "Sell price",
+                    min_value=1, value=3500, step=1, key="entry_price"
+                )
+        target_price = st.number_input(
+            f"Target price ({quote_currency})", min_value=1, value=5000, step=1, key="target_price"
         )
-    target_price = st.number_input(
-        f"Target price ({quote_currency})", min_value=1, value=5000, step=1
-    )
-    currency_col, investment_col = st.columns([1.15, 1.85], gap="small", vertical_alignment="bottom")
-    with currency_col:
-        investment_currency = st.selectbox("Your currency", CURRENCIES, index=0, key="investment_currency")
-    with investment_col:
-        investment = st.number_input(
-            "Money for this trade", min_value=1, value=35000, step=100, key="investment"
-        )
-    leverage = st.slider("Leverage", min_value=1, max_value=100, value=5, step=1, format="%d×")
+    with money_col:
+        with st.container(key="investment_pair"):
+            currency_col, investment_col = st.columns([1.15, 1.85], gap="small", vertical_alignment="bottom")
+            with currency_col:
+                investment_currency = st.selectbox("Your currency", CURRENCIES, index=0, key="investment_currency")
+            with investment_col:
+                investment = st.number_input(
+                    "Money for this trade", min_value=1, value=35000, step=100, key="investment"
+                )
+        leverage = st.slider("Leverage", min_value=1, max_value=100, value=5, step=1, format="%d×")
 
     exchange_rate_error = ""
     if investment_currency == quote_currency:
@@ -169,13 +178,13 @@ with st.sidebar:
             f"One-time funding fee ({investment_currency})", min_value=0, value=0, step=1
         )
 
-    st.button("Calculate trade", type="primary", use_container_width=True)
-
-st.title("Trade calculator")
-st.caption("See your possible profit or loss and plan for liquidation.")
-st.caption("Edit your trade details in the sidebar. On a phone, open it using the top-left arrow.")
+    calculate_clicked = st.button("Calculate trade", type="primary", use_container_width=True)
 
 errors: list[str] = []
+if side == "buy" and target_price <= entry_price:
+    errors.append("For a BUY trade, the target price must be higher than the buy price.")
+if side == "sell" and target_price >= entry_price:
+    errors.append("For a SELL trade, the target price must be lower than the sell price.")
 if maintenance_rate >= 100:
     errors.append("Maintenance margin must be less than 100%.")
 if opening_fee_rate >= 100:
@@ -185,8 +194,16 @@ if closing_fee_rate >= 100:
 if exchange_rate_error:
     errors.append(exchange_rate_error)
 
+inputs = (
+    side, asset, quote_currency, entry_price, target_price, investment_currency,
+    investment, leverage, exchange_rate, exchange_rate_error, maintenance_rate,
+    opening_fee_rate, closing_fee_rate, funding_fee,
+)
+if st.session_state.get("calculated_inputs") != inputs:
+    st.session_state.pop("calculated_inputs", None)
+
 position = None
-if not errors and exchange_rate is not None:
+if (calculate_clicked or st.session_state.get("calculated_inputs") == inputs) and not errors and exchange_rate is not None:
     try:
         position = calculate_position(
             side=side,
@@ -203,10 +220,13 @@ if not errors and exchange_rate is not None:
     except ValueError as error:
         errors.append(str(error))
 
-if errors:
+if calculate_clicked and errors:
+    st.session_state.pop("calculated_inputs", None)
     for error in errors:
         st.error(error)
 elif position is not None:
+    if calculate_clicked:
+        st.session_state["calculated_inputs"] = inputs
     st.caption(
         f"{asset.strip() or 'Your position'} · {side_label} · "
         f"{money(position.position_notional, investment_currency)} trade value"
@@ -215,6 +235,8 @@ elif position is not None:
 
     with overview_tab:
         st.subheader("If your target is reached")
+        if position.net_profit_loss <= 0:
+            st.warning("Fees and funding make this target unprofitable, despite the favorable price move.")
         pnl_col, return_col, value_col = st.columns(3)
         pnl_col.metric("Net profit / loss", signed_money(position.net_profit_loss, investment_currency))
         return_col.metric("Return on your money", percent(position.return_percent, signed=True))
@@ -226,9 +248,9 @@ elif position is not None:
                     {"Metric": "Money for this trade", "Value": money(position.investment, investment_currency)},
                     {"Metric": "Trade value", "Value": money(position.position_notional, investment_currency)},
                     {"Metric": "Asset quantity", "Value": f"{position.quantity:,.5f} units"},
-                    {"Metric": "Entry price", "Value": price(position.entry_price, quote_currency)},
+                    {"Metric": "Buy price" if side == "buy" else "Sell price", "Value": price(position.entry_price, quote_currency)},
                     {"Metric": "Target price", "Value": price(position.target_price, quote_currency)},
-                    {"Metric": "Price movement", "Value": f"{signed_money(position.price_change, quote_currency)} ({percent(position.price_change_percent, signed=True)})"},
+                    {"Metric": "Price movement", "Value": f"{signed_money(position.target_price - position.entry_price, quote_currency)} ({percent((position.target_price - position.entry_price) / position.entry_price * 100, signed=True)})"},
                     {"Metric": "Gross profit / loss", "Value": signed_money(position.gross_profit_loss, investment_currency)},
                     {"Metric": "Fees and funding", "Value": money(position.total_fees, investment_currency)},
                 ]
@@ -237,7 +259,7 @@ elif position is not None:
         st.subheader("Liquidation price")
         liq_col, equity_col, buffer_col = st.columns(3)
         liq_col.metric("Estimated liquidation price", price(position.liquidation_price, quote_currency))
-        equity_col.metric("Money after opening fees", money(position.available_equity, investment_currency))
+        equity_col.metric("Money after opening fees and funding", money(position.available_equity, investment_currency))
         buffer_col.metric("Money above minimum margin", money(position.remaining_margin_buffer, investment_currency))
         st.caption("Liquidation is when the exchange may close your trade because its available margin is too low.")
         if position.liquidation_price is None:
@@ -326,9 +348,8 @@ elif position is not None:
 
     st.divider()
     st.caption(
-        "Results are rounded to whole numbers except asset quantity, which has five decimal places; "
-        "required margin is rounded up. Small prices and quantities can round to zero, and liquidation and stress prices can "
-        "appear equal after rounding. Calculations use full input precision."
+        "Results are rounded; asset quantity uses five decimals and required margin is rounded up. "
+        "Small values may round to zero, and liquidation and stress prices may appear equal."
     )
     st.caption(
         "Simplified isolated-margin estimates for planning only, not financial advice. "
