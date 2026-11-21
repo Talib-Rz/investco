@@ -13,6 +13,23 @@ def calculate(app):
 
 
 class MarginProtectionAppTests(unittest.TestCase):
+    def test_fee_settings_are_inline_and_preserved(self):
+        app = AppTest.from_file("app.py").run()
+        settings = app.expander[0].expander[0]
+        self.assertEqual(settings.label, "Fees and extra settings")
+        self.assertFalse(settings.proto.expanded)
+        settings.number_input(key="opening_fee_rate").set_value(0.5).run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.number_input(key="opening_fee_rate").value, 0.5)
+        calculate(app)
+        self.assertFalse(app.exception)
+        self.assertTrue(app.tabs)
+        self.assertEqual(app.number_input(key="opening_fee_rate").value, 0.5)
+        self.assertEqual(
+            next(m.value for m in app.metric if m.label == "Money after opening fees and funding"),
+            "₹34,125",
+        )
+
     def test_results_require_calculation_and_reset_after_edit(self):
         app = AppTest.from_file("app.py").run()
         self.assertFalse(app.tabs)

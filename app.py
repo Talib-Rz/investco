@@ -28,31 +28,123 @@ st.markdown(
     [data-testid="stAppDeployButton"], [data-testid="stMainMenu"],
     [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
     [data-testid="stExpandSidebarButton"] { display: none; }
-    .block-container { max-width: 1120px; padding-top: 2.5rem; padding-bottom: 3rem; }
-    [data-testid="stMain"] h1 { letter-spacing: -0.035em; }
-    [data-testid="stMain"] h3 { letter-spacing: -0.015em; }
+    [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background: #f3f7f7;
+    }
+    [data-testid="stMain"], [data-testid="stMain"] h1,
+    [data-testid="stMain"] h2, [data-testid="stMain"] h3,
+    [data-testid="stMain"] h4, [data-testid="stMain"] p,
+    [data-testid="stMain"] button, [data-testid="stMain"] input,
+    [data-testid="stMain"] select, [data-testid="stMain"] [data-testid="stMetricValue"] {
+        font-family: "Aptos", "Segoe UI", "Helvetica Neue", sans-serif;
+    }
+    .block-container { max-width: 1080px; padding-top: 2.5rem; padding-bottom: 3.5rem; }
+    [data-testid="stMain"] h1 {
+        color: #102c35;
+        font-size: clamp(2.2rem, 4vw, 2.8rem);
+        font-weight: 750;
+        letter-spacing: -0.045em;
+    }
+    [data-testid="stMain"] h3, [data-testid="stMain"] h4 {
+        color: #16343c;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+    }
+    [data-testid="stMain"] h3 { font-size: 1.25rem; }
+    [data-testid="stMain"] h4 { font-size: 1.05rem; }
+    [data-testid="stMain"] [data-testid="stCaptionContainer"] {
+        color: #536b72;
+        line-height: 1.55;
+        opacity: 1;
+    }
+    [data-testid="stMain"] [data-testid="stCaptionContainer"] p { font-size: 0.875rem; }
+    [data-testid="stMain"] label p {
+        color: #29444c;
+        font-weight: 600;
+    }
     [data-testid="stMetric"] {
-        background: #f7f9fd;
-        padding: 1.15rem;
-        border: 1px solid #e0e6f0;
-        border-radius: 0.8rem;
+        background: #ffffff;
+        padding: 1.25rem;
+        border: 1px solid #dce8e7;
+        border-top: 3px solid #9ccdc5;
+        border-radius: 0.75rem;
+        box-shadow: 0 3px 14px rgba(20, 54, 60, 0.04);
         height: 100%;
     }
-    [data-testid="stMetricLabel"] { opacity: 0.85; }
-    [data-testid="stMetricValue"] { font-size: clamp(1.25rem, 2vw, 1.75rem); }
+    [data-testid="stMetricLabel"] {
+        color: #526a70;
+        font-weight: 600;
+    }
+    [data-testid="stMetricValue"] {
+        color: #11363c;
+        font-size: clamp(1.35rem, 2vw, 1.8rem);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+    }
     [data-testid="stMetricValue"] > div {
         white-space: normal;
         overflow-wrap: anywhere;
     }
-    [data-testid="stTabs"] [role="tablist"] { gap: 1.5rem; border-bottom: 1px solid #e0e6f0; }
+    [data-testid="stTabs"] [role="tablist"] {
+        gap: 1.5rem;
+        border-bottom: 1px solid #cfdddc;
+    }
     [data-testid="stTabs"] [role="tab"] {
         min-height: 3rem;
         padding: 0.75rem 0.2rem;
         font-weight: 600;
     }
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #08766c; }
     [data-testid="stMain"] [data-testid="stExpander"] {
-        border-color: #e0e6f0;
-        border-radius: 0.75rem;
+        background: #ffffff;
+        border: 1px solid #d9e5e4;
+        border-radius: 0.85rem;
+        box-shadow: 0 4px 18px rgba(20, 54, 60, 0.04);
+    }
+    [data-testid="stMain"] [data-testid="stExpander"] [data-testid="stExpander"] {
+        background: #f8fbfa;
+        box-shadow: none;
+    }
+    [data-testid="stMain"] [data-testid="stExpander"] summary p {
+        color: #193a41;
+        font-weight: 700;
+    }
+    [data-testid="stMain"] [data-testid="stNumberInputContainer"],
+    [data-testid="stMain"] [data-testid="stTextInputRootElement"] {
+        border-radius: 0.5rem;
+    }
+    [data-testid="stMain"] [data-testid="stButton"] button {
+        min-height: 2.8rem;
+        border-radius: 0.55rem;
+        font-weight: 650;
+    }
+    [data-testid="stMain"] [data-testid="stButton"] button[kind="primary"] {
+        background: #08766c;
+        border-color: #08766c;
+        color: #ffffff;
+    }
+    [data-testid="stMain"] [data-testid="stButton"] button[kind="primary"]:hover {
+        background: #075e57;
+        border-color: #075e57;
+        color: #ffffff;
+    }
+    [data-testid="stMain"] [data-testid="stButton"] button[kind="secondary"] {
+        color: #15574f;
+        border-color: #adcac5;
+        background: #ffffff;
+    }
+    [data-testid="stMain"] [data-testid="stButton"] button[kind="secondary"]:hover {
+        color: #075e57;
+        border-color: #08766c;
+        background: #edf7f5;
+    }
+    [data-testid="stMain"] .st-key-deposit_card,
+    [data-testid="stMain"] .st-key-stress_card {
+        background: #ffffff;
+        border-color: #d9e5e4;
+        border-radius: 0.85rem;
+        box-shadow: 0 4px 18px rgba(20, 54, 60, 0.04);
     }
     @media (max-width: 900px) {
         [data-testid="stMain"] [data-testid="stHorizontalBlock"] {
@@ -65,7 +157,7 @@ st.markdown(
         }
     }
     @media (max-width: 600px) {
-        .block-container { padding: 1.25rem 1rem 2rem; }
+        .block-container { padding: 1.4rem 1rem 2rem; }
         [data-testid="stMain"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
             flex-basis: 100%;
         }
@@ -186,7 +278,7 @@ with st.container(key=f"trade_inputs_{st.session_state.get('results_version', 0)
             except ValueError:
                 exchange_rate_error = "Exchange rate must be a positive number."
 
-    with st.popover("Fees and extra settings"):
+    with st.expander("Fees and extra settings"):
         maintenance_rate = st.number_input(
             "Minimum margin rate (%)", value=0.5, step=0.1,
             help="The exchange's maintenance margin rate. Decimal values are allowed.",
@@ -360,7 +452,7 @@ if position is not None and st.session_state.get("calculated_inputs") == inputs:
             "an already closed trade cannot be restored."
         )
         deposit_col, stress_col = st.columns(2, gap="large")
-        with deposit_col, st.container(border=True):
+        with deposit_col, st.container(border=True, key="deposit_card"):
             st.markdown("#### I know how much to add")
             deposit_text = st.text_input(
                 f"Money to add ({investment_currency})",
@@ -392,7 +484,7 @@ if position is not None and st.session_state.get("calculated_inputs") == inputs:
                         )
                         if deposit_position.liquidation_price is None:
                             st.caption("No positive liquidation level is available in this model.")
-        with stress_col, st.container(border=True):
+        with stress_col, st.container(border=True, key="stress_card"):
             st.markdown("#### I know the price to survive")
             stress_text = st.text_input(
                 f"Price to survive ({quote_currency})",
