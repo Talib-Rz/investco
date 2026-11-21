@@ -8,6 +8,25 @@ from calculations import calculate_additional_margin, calculate_position, calcul
 
 
 class MarginProtectionAppTests(unittest.TestCase):
+    def test_calculate_buttons_recalculate_and_preserve_results(self):
+        app = AppTest.from_file("app.py").run()
+        original_pnl = next(m.value for m in app.metric if m.label == "Net profit / loss")
+        app.number_input[0].set_value(4000)
+        next(button for button in app.button if button.label == "Calculate trade").click().run()
+        self.assertFalse(app.exception)
+        self.assertNotEqual(
+            original_pnl, next(m.value for m in app.metric if m.label == "Net profit / loss")
+        )
+        app.text_input(key="deposit").set_value("1000")
+        app.button(key="calculate_deposit").click().run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any(m.label == "New liquidation price" for m in app.metric))
+        app.text_input(key="stress").set_value("2500")
+        app.button(key="calculate_stress").click().run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any(m.label == "Money to add" for m in app.metric))
+        self.assertTrue(any(m.label == "New liquidation price" for m in app.metric))
+
     def test_deposit_and_stress_price_work_independently_for_both_sides(self):
         for side, stress in (("BUY · Long", "2500"), ("SELL · Short", "5000")):
             with self.subTest(side=side):
@@ -136,6 +155,24 @@ class MarginProtectionAppTests(unittest.TestCase):
         app.text_input(key="fx-INR-USD").set_value("83.25").run()
         self.assertFalse(app.exception)
         self.assertFalse(app.error)
+
+    def test_currency_changes_preserve_amounts_and_conversion(self):
+        app = AppTest.from_file("app.py").run()
+        app.number_input(key="entry_price").set_value(4000)
+        app.number_input(key="investment").set_value(12345)
+        app.selectbox(key="quote_currency").select("USDT").run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.number_input(key="entry_price").value, 4000)
+        self.assertEqual(app.number_input(key="investment").value, 12345)
+        self.assertTrue(any("exchange rate" in item.value.lower() for item in app.error))
+        app.text_input(key="fx-INR-USDT").set_value("83.5").run()
+        self.assertFalse(app.error)
+        app.selectbox(key="investment_currency").select("USDT").run()
+        self.assertFalse(app.exception)
+        self.assertFalse(app.error)
+        self.assertEqual(app.number_input(key="entry_price").value, 4000)
+        self.assertEqual(app.number_input(key="investment").value, 12345)
+        self.assertTrue(any("₮" in metric.value for metric in app.metric))
 
 
 if __name__ == "__main__":

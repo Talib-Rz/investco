@@ -2,9 +2,12 @@
 
 Streamlit calculator for linear perpetual positions. Estimate long/short profit or loss, fees, liquidation risk, and the money needed to survive a selected price.
 
+Enter the trade details in the sidebar and select **Calculate trade**. Results
+also update when inputs are submitted with a keyboard.
+
 Under **Save Liquidation**, enter either an additional margin amount to see
 the new liquidation price, or an adverse asset price to estimate the required
-margin. The two options are independent and both assume the deposit is made
+margin, then select the corresponding calculate button. The two options are independent and both assume the deposit is made
 before the original liquidation; they cannot restore an already liquidated position.
 Both use the selected leverage and original trade size. Adding margin does not
 open a larger position, so effective leverage (trade size divided by total margin)

@@ -29,6 +29,13 @@ st.markdown(
     .block-container { max-width: 1120px; padding-top: 2.5rem; padding-bottom: 3rem; }
     [data-testid="stSidebar"] { border-right: 1px solid #e0e6f0; }
     [data-testid="stSidebar"] .block-container { padding-top: 2rem; }
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+    }
+    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        min-width: 0;
+    }
     [data-testid="stMain"] h1 { letter-spacing: -0.035em; }
     [data-testid="stMain"] h3 { letter-spacing: -0.015em; }
     [data-testid="stMetric"] {
@@ -108,17 +115,23 @@ with st.sidebar:
     side_label = st.radio("Buy or sell", ("BUY · Long", "SELL · Short"), horizontal=True)
     side = "buy" if side_label.startswith("BUY") else "sell"
     asset = st.text_input("Asset name (optional)", placeholder="e.g. Bitcoin")
-    quote_currency = st.selectbox("Price currency", CURRENCIES, index=1)
-    entry_price = st.number_input(
-        f"Buy or sell price ({quote_currency})", min_value=1, value=3500, step=1
-    )
+    quote_col, entry_col = st.columns([1.15, 1.85], gap="small", vertical_alignment="bottom")
+    with quote_col:
+        quote_currency = st.selectbox("Price currency", CURRENCIES, index=1, key="quote_currency")
+    with entry_col:
+        entry_price = st.number_input(
+            "Buy or sell price", min_value=1, value=3500, step=1, key="entry_price"
+        )
     target_price = st.number_input(
         f"Target price ({quote_currency})", min_value=1, value=5000, step=1
     )
-    investment_currency = st.selectbox("Your money's currency", CURRENCIES, index=0)
-    investment = st.number_input(
-        f"Money for this trade ({investment_currency})", min_value=1, value=35000, step=100
-    )
+    currency_col, investment_col = st.columns([1.15, 1.85], gap="small", vertical_alignment="bottom")
+    with currency_col:
+        investment_currency = st.selectbox("Your currency", CURRENCIES, index=0, key="investment_currency")
+    with investment_col:
+        investment = st.number_input(
+            "Money for this trade", min_value=1, value=35000, step=100, key="investment"
+        )
     leverage = st.slider("Leverage", min_value=1, max_value=100, value=5, step=1, format="%d×")
 
     exchange_rate_error = ""
@@ -155,6 +168,8 @@ with st.sidebar:
         funding_fee = st.number_input(
             f"One-time funding fee ({investment_currency})", min_value=0, value=0, step=1
         )
+
+    st.button("Calculate trade", type="primary", use_container_width=True)
 
 st.title("Trade calculator")
 st.caption("See your possible profit or loss and plan for liquidation.")
@@ -252,6 +267,7 @@ elif position is not None:
                 placeholder="Enter an amount",
                 key="deposit",
             )
+            st.button("Calculate new liquidation", key="calculate_deposit", use_container_width=True)
             if deposit_text.strip():
                 try:
                     deposit = float(deposit_text)
@@ -281,6 +297,7 @@ elif position is not None:
                 placeholder="Enter a price beyond liquidation",
                 key="stress",
             )
+            st.button("Calculate money to add", key="calculate_stress", use_container_width=True)
             if stress_text.strip():
                 try:
                     stress_price = float(stress_text)
