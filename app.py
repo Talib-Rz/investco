@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import ceil
+from math import ceil, isfinite
 
 import streamlit as st
 
@@ -110,11 +110,25 @@ def percent(value: float, *, signed: bool = False) -> str:
     return f"{rounded:+d}%" if signed and rounded else f"{rounded}%"
 
 
+def highlight_invalid(keys: set[str]) -> None:
+    if keys:
+        selectors = ", ".join(
+            f'.st-key-{key} :is([data-baseweb="input"], '
+            '[data-testid="stNumberInputContainer"], [data-testid="stTextInputRootElement"])'
+            for key in sorted(keys)
+        )
+        st.markdown(
+            f"<style>{selectors} {{ box-shadow: 0 0 0 2px #c93434; border-radius: 0.4rem; }}</style>",
+            unsafe_allow_html=True,
+        )
+
+
 st.title("Investco")
 st.caption("Calculate your trade and plan for liquidation.")
 
-with st.container(border=True):
-    st.subheader("Your trade")
+with st.container(key=f"trade_inputs_{st.session_state.get('results_version', 0)}").expander(
+    "Your trade", expanded=not st.session_state.get("calculated_inputs")
+):
     side_label = st.radio("Buy or sell", ("BUY · Long", "SELL · Short"), horizontal=True)
     side = "buy" if side_label.startswith("BUY") else "sell"
     asset = st.text_input("Asset name (optional)", placeholder="e.g. Bitcoin")
@@ -127,11 +141,12 @@ with st.container(border=True):
             with entry_col:
                 entry_price = st.number_input(
                     "Buy price" if side == "buy" else "Sell price",
-                    min_value=1, value=3500, step=1, key="entry_price"
+                    value=3500, step=1, key="entry_price"
                 )
         target_price = st.number_input(
-            f"Target price ({quote_currency})", min_value=1, value=5000, step=1, key="target_price"
+            f"Target price ({quote_currency})", value=5000, step=1, key="target_price"
         )
+        target_feedback = st.empty()
     with money_col:
         with st.container(key="investment_pair"):
             currency_col, investment_col = st.columns([1.15, 1.85], gap="small", vertical_alignment="bottom")
@@ -139,9 +154,16 @@ with st.container(border=True):
                 investment_currency = st.selectbox("Your currency", CURRENCIES, index=0, key="investment_currency")
             with investment_col:
                 investment = st.number_input(
-                    "Money for this trade", min_value=1, value=35000, step=100, key="investment"
+                    "Money for this trade", value=35000, step=100, key="investment"
                 )
-        leverage = st.slider("Leverage", min_value=1, max_value=100, value=5, step=1, format="%d×")
+        leverage_input = st.number_input(
+            "Leverage", value=5.0, step=1.0, format="%g", key="leverage"
+        )
+        leverage = (
+            int(leverage_input)
+            if isfinite(leverage_input) and leverage_input.is_integer()
+            else leverage_input
+        )
 
     exchange_rate_error = ""
     if investment_currency == quote_currency:
@@ -154,6 +176,7 @@ with st.container(border=True):
             key=f"fx-{investment_currency}-{quote_currency}",
             help="Enter the exchange rate manually. Decimal values are allowed.",
         )
+        exchange_feedback = st.empty()
         exchange_rate = None
         if not exchange_rate_text.strip():
             exchange_rate_error = "Enter an exchange rate for the selected currencies."
@@ -163,36 +186,67 @@ with st.container(border=True):
             except ValueError:
                 exchange_rate_error = "Exchange rate must be a positive number."
 
-    with st.expander("Fees and extra settings"):
+    with st.popover("Fees and extra settings"):
         maintenance_rate = st.number_input(
-            "Minimum margin rate (%)", min_value=0.0, max_value=100.0, value=0.5, step=0.1,
+            "Minimum margin rate (%)", value=0.5, step=0.1,
             help="The exchange's maintenance margin rate. Decimal values are allowed.",
+            key="maintenance_rate",
         )
         opening_fee_rate = st.number_input(
-            "Opening fee (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.01
+            "Opening fee (%)", value=0.0, step=0.01, key="opening_fee_rate"
         )
         closing_fee_rate = st.number_input(
-            "Closing fee (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.01
+            "Closing fee (%)", value=0.0, step=0.01, key="closing_fee_rate"
         )
         funding_fee = st.number_input(
-            f"One-time funding fee ({investment_currency})", min_value=0, value=0, step=1
+            f"One-time funding fee ({investment_currency})", value=0, step=1, key="funding_fee"
         )
 
+    trade_feedback = st.empty()
     calculate_clicked = st.button("Calculate trade", type="primary", use_container_width=True)
 
 errors: list[str] = []
+invalid_fields: set[str] = set()
+for key, value, message in (
+    ("entry_price", entry_price, "Entry price must be greater than zero."),
+    ("target_price", target_price, "Target price must be greater than zero."),
+    ("investment", investment, "Money for this trade must be greater than zero."),
+    ("funding_fee", funding_fee, "Funding fee cannot be negative."),
+):
+    if value < 0 or (value == 0 and key != "funding_fee"):
+        errors.append(message)
+        invalid_fields.add(key)
+if not isfinite(leverage_input) or not leverage_input.is_integer() or not 1 <= leverage_input <= 100:
+    errors.append("Leverage must be a whole number between 1 and 100.")
+    invalid_fields.add("leverage")
 if side == "buy" and target_price <= entry_price:
-    errors.append("For a BUY trade, the target price must be higher than the buy price.")
+    target_error = "For a BUY trade, the target price must be higher than the buy price."
+    errors.append(target_error)
+    target_feedback.error(target_error)
+    invalid_fields.add("target_price")
 if side == "sell" and target_price >= entry_price:
-    errors.append("For a SELL trade, the target price must be lower than the sell price.")
-if maintenance_rate >= 100:
-    errors.append("Maintenance margin must be less than 100%.")
-if opening_fee_rate >= 100:
-    errors.append("Opening fee must be less than 100%.")
-if closing_fee_rate >= 100:
-    errors.append("Closing fee must be less than 100%.")
+    target_error = "For a SELL trade, the target price must be lower than the sell price."
+    errors.append(target_error)
+    target_feedback.error(target_error)
+    invalid_fields.add("target_price")
+if not 0 <= maintenance_rate < 100:
+    errors.append("Maintenance margin must be at least 0% and less than 100%.")
+    invalid_fields.add("maintenance_rate")
+if not 0 <= opening_fee_rate < 100:
+    errors.append("Opening fee must be at least 0% and less than 100%.")
+    invalid_fields.add("opening_fee_rate")
+if not 0 <= closing_fee_rate < 100:
+    errors.append("Closing fee must be at least 0% and less than 100%.")
+    invalid_fields.add("closing_fee_rate")
+if maintenance_rate < 100 and closing_fee_rate < 100 and maintenance_rate + closing_fee_rate >= 100:
+    errors.append("Maintenance margin and closing fee rates must total less than 100%.")
+    invalid_fields.update(("maintenance_rate", "closing_fee_rate"))
+if exchange_rate is not None and (not isfinite(exchange_rate) or exchange_rate <= 0):
+    exchange_rate_error = "Exchange rate must be a positive, finite number."
 if exchange_rate_error:
     errors.append(exchange_rate_error)
+    exchange_feedback.error(exchange_rate_error)
+    invalid_fields.add(f"fx-{investment_currency}-{quote_currency}")
 
 inputs = (
     side, asset, quote_currency, entry_price, target_price, investment_currency,
@@ -203,7 +257,7 @@ if st.session_state.get("calculated_inputs") != inputs:
     st.session_state.pop("calculated_inputs", None)
 
 position = None
-if (calculate_clicked or st.session_state.get("calculated_inputs") == inputs) and not errors and exchange_rate is not None:
+if not errors and exchange_rate is not None:
     try:
         position = calculate_position(
             side=side,
@@ -219,19 +273,43 @@ if (calculate_clicked or st.session_state.get("calculated_inputs") == inputs) an
         )
     except ValueError as error:
         errors.append(str(error))
+        if "at or beyond liquidation" in str(error):
+            invalid_fields.update(("leverage", "investment"))
+            invalid_fields.update(
+                key for key, value in (
+                    ("funding_fee", funding_fee), ("maintenance_rate", maintenance_rate),
+                    ("opening_fee_rate", opening_fee_rate), ("closing_fee_rate", closing_fee_rate),
+                ) if value
+            )
+        else:
+            invalid_fields.update(("entry_price", "target_price", "investment", "leverage"))
+            if investment_currency != quote_currency:
+                invalid_fields.add(f"fx-{investment_currency}-{quote_currency}")
 
-if calculate_clicked and errors:
-    st.session_state.pop("calculated_inputs", None)
-    for error in errors:
-        st.error(error)
-elif position is not None:
-    if calculate_clicked:
-        st.session_state["calculated_inputs"] = inputs
+general_errors = [
+    error for error in errors
+    if error != exchange_rate_error and error not in (
+        "For a BUY trade, the target price must be higher than the buy price.",
+        "For a SELL trade, the target price must be lower than the sell price.",
+    )
+]
+if general_errors:
+    trade_feedback.error("\n\n".join(general_errors))
+highlight_invalid(invalid_fields)
+
+if calculate_clicked and not errors and position is not None:
+    st.session_state["calculated_inputs"] = inputs
+    st.session_state["results_version"] = st.session_state.get("results_version", 0) + 1
+    st.rerun()
+
+if position is not None and st.session_state.get("calculated_inputs") == inputs:
     st.caption(
         f"{asset.strip() or 'Your position'} · {side_label} · "
         f"{money(position.position_notional, investment_currency)} trade value"
     )
-    overview_tab, protection_tab = st.tabs(["Trade summary", "Save Liquidation"])
+    overview_tab, protection_tab = st.container(
+        key=f"results_{st.session_state.get('results_version', 0)}"
+    ).tabs(["Trade summary", "Save Liquidation"])
 
     with overview_tab:
         st.subheader("If your target is reached")
@@ -295,11 +373,13 @@ elif position is not None:
                     deposit = float(deposit_text)
                 except ValueError:
                     st.warning("Additional margin must be a number.")
+                    highlight_invalid({"deposit"})
                 else:
                     try:
                         deposit_position = calculate_position_with_deposit(position, deposit)
                     except ValueError as error:
                         st.warning(str(error))
+                        highlight_invalid({"deposit"})
                     else:
                         st.metric(
                             "New liquidation price",
@@ -325,14 +405,17 @@ elif position is not None:
                     stress_price = float(stress_text)
                 except ValueError:
                     st.warning("Stress price must be a number.")
+                    highlight_invalid({"stress"})
                 else:
                     try:
                         margin_result = calculate_additional_margin(position, stress_price)
                     except ValueError as error:
                         st.warning(str(error))
+                        highlight_invalid({"stress"})
                     else:
                         if not margin_result.valid:
                             st.warning(margin_result.reason)
+                            highlight_invalid({"stress"})
                         else:
                             required_margin = ceil(margin_result.additional_margin_required)
                             funded = calculate_position_with_deposit(position, required_margin)

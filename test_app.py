@@ -24,11 +24,11 @@ class MarginProtectionAppTests(unittest.TestCase):
         self.assertFalse(app.tabs)
         calculate(app)
         self.assertNotEqual(original, next(m.value for m in app.metric if m.label == "Net profit / loss"))
-        app.number_input[3].set_value(100.0)
+        app.number_input(key="maintenance_rate").set_value(100.0)
         calculate(app)
         self.assertTrue(app.error)
         self.assertFalse(app.tabs)
-        app.number_input[3].set_value(0.5).run()
+        app.number_input(key="maintenance_rate").set_value(0.5).run()
         self.assertFalse(app.tabs)
         calculate(app)
         self.assertFalse(app.error)
@@ -123,11 +123,14 @@ class MarginProtectionAppTests(unittest.TestCase):
             original_pnl, next(m.value for m in app.metric if m.label == "Net profit / loss")
         )
         self.assertEqual([tab.label for tab in app.tabs], ["Trade summary", "Save Liquidation"])
-        for field in (app.number_input[0], app.number_input[1], app.number_input[2], app.number_input[-1]):
+        for field in (
+            app.number_input(key="entry_price"), app.number_input(key="target_price"),
+            app.number_input(key="investment"), app.number_input(key="funding_fee"),
+        ):
             self.assertIsInstance(field.value, int)
-        self.assertIsInstance(app.slider[0].value, int)
+        self.assertEqual(app.number_input(key="leverage").value, 5)
         self.assertEqual(app.text_input(key="fx-INR-USD").value, "83.5")
-        self.assertEqual(app.number_input[3].value, 0.5)
+        self.assertEqual(app.number_input(key="maintenance_rate").value, 0.5)
 
     def test_asset_quantity_shows_five_decimal_places(self):
         app = calculate(AppTest.from_file("app.py").run())
@@ -149,7 +152,7 @@ class MarginProtectionAppTests(unittest.TestCase):
                     app.radio[0].set_value(side_label)
                     if side == "sell":
                         app.number_input(key="target_price").set_value(2500)
-                    app.slider[0].set_value(leverage).run()
+                    app.number_input(key="leverage").set_value(leverage).run()
                     calculate(app)
                     app.text_input(key="deposit").set_value("1000")
                     app.text_input(key="stress").set_value(str(stress)).run()
@@ -201,30 +204,81 @@ class MarginProtectionAppTests(unittest.TestCase):
                     app = AppTest.from_file("app.py").run()
                     app.radio[0].set_value(side)
                     app.number_input(key="target_price").set_value(target).run()
+                    self.assertTrue(any(message in error.value for error in app.error))
+                    self.assertTrue(any(".st-key-target_price " in item.value for item in app.markdown))
                     calculate(app)
                     self.assertFalse(app.exception)
                     self.assertFalse(app.tabs)
                     self.assertTrue(any(message in error.value for error in app.error))
                     app.number_input(key="target_price").set_value(valid_target).run()
+                    self.assertFalse(app.error)
+                    self.assertFalse(any(".st-key-target_price " in item.value for item in app.markdown))
                     calculate(app)
                     self.assertFalse(app.error)
                     self.assertTrue(app.tabs)
 
+    def test_leverage_validation_and_collapsible_trade(self):
+        app = AppTest.from_file("app.py").run()
+        self.assertTrue(app.expander[0].proto.expanded)
+        for value in (0.0, -1.0, 101.0, 1.5):
+            with self.subTest(leverage=value):
+                app.number_input(key="leverage").set_value(value).run()
+                self.assertTrue(any("whole number between 1 and 100" in error.value for error in app.error))
+                self.assertTrue(any(".st-key-leverage " in item.value for item in app.markdown))
+                calculate(app)
+                self.assertTrue(app.expander[0].proto.expanded)
+                self.assertFalse(app.tabs)
+        for value in (1.0, 100.0):
+            with self.subTest(leverage=value):
+                app.number_input(key="leverage").set_value(value).run()
+                self.assertFalse(app.error)
+                self.assertFalse(any(".st-key-leverage " in item.value for item in app.markdown))
+                calculate(app)
+                self.assertFalse(app.expander[0].proto.expanded)
+                self.assertTrue(app.tabs)
+
+    def test_immediate_validation_of_other_inputs(self):
+        app = AppTest.from_file("app.py").run()
+        for key in ("entry_price", "target_price", "investment"):
+            with self.subTest(key=key):
+                field = app.number_input(key=key)
+                original = field.value
+                field.set_value(0).run()
+                self.assertTrue(app.error)
+                self.assertTrue(any(f".st-key-{key} " in item.value for item in app.markdown))
+                app.number_input(key=key).set_value(original).run()
+                self.assertFalse(app.error)
+        app.text_input(key="fx-INR-USD").set_value("0").run()
+        self.assertTrue(any("Exchange rate" in item.value for item in app.error))
+        self.assertTrue(any(".st-key-fx-INR-USD " in item.value for item in app.markdown))
+        app.text_input(key="fx-INR-USD").set_value("83.5").run()
+        self.assertFalse(app.error)
+        app.number_input(key="opening_fee_rate").set_value(-1.0).run()
+        self.assertTrue(any(".st-key-opening_fee_rate " in item.value for item in app.markdown))
+        app.number_input(key="opening_fee_rate").set_value(0.0).run()
+        self.assertFalse(app.error)
+        calculate(app)
+        for key, value in (("deposit", "-1"), ("stress", "bad")):
+            app.text_input(key=key).set_value(value).run()
+            self.assertTrue(any(f".st-key-{key} " in item.value for item in app.markdown))
+            app.text_input(key=key).set_value("").run()
+            self.assertFalse(any(f".st-key-{key} " in item.value for item in app.markdown))
+
     def test_fee_guardrails_and_unprofitable_target_warning(self):
         app = AppTest.from_file("app.py").run()
-        app.number_input[3].set_value(50.0)
-        app.number_input[5].set_value(50.0).run()
+        app.number_input(key="maintenance_rate").set_value(50.0)
+        app.number_input(key="closing_fee_rate").set_value(50.0).run()
         calculate(app)
         self.assertFalse(app.tabs)
         self.assertTrue(any("total less than 100%" in error.value for error in app.error))
-        app.number_input[3].set_value(20.0)
-        app.number_input[5].set_value(0.0).run()
+        app.number_input(key="maintenance_rate").set_value(20.0)
+        app.number_input(key="closing_fee_rate").set_value(0.0).run()
         calculate(app)
         self.assertFalse(app.tabs)
         self.assertTrue(any("at or beyond liquidation" in error.value for error in app.error))
-        app.number_input[3].set_value(0.5)
+        app.number_input(key="maintenance_rate").set_value(0.5)
         app.number_input(key="target_price").set_value(3501)
-        app.number_input[4].set_value(0.1).run()
+        app.number_input(key="opening_fee_rate").set_value(0.1).run()
         calculate(app)
         self.assertFalse(app.error)
         self.assertTrue(any("unprofitable" in warning.value for warning in app.warning))

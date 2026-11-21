@@ -3,8 +3,9 @@
 Streamlit calculator for linear perpetual positions. Estimate long/short profit or loss, fees, liquidation risk, and the money needed to survive a selected price.
 
 Enter the trade details at the top and select **Calculate trade** to see the
-summary and liquidation options. After changing trade details, calculate again
-to update the results.
+summary and liquidation options. The trade details collapse after a successful
+calculation; open **Your trade** to edit them and calculate again. Invalid
+values are highlighted with an explanation.
 
 A BUY target must be above the entry price and a SELL target must be below it.
 Fees and funding can still make a favorable price move unprofitable. Trades
